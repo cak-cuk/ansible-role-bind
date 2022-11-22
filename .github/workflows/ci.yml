@@ -1,16 +1,18 @@
 ---
 name: CI
-'on':
+on:
   pull_request:
   push:
     branches:
       - master
+env:
+  PY_COLORS: '1'
+  ANSIBLE_FORCE_COLOR: '1'
 
 jobs:
-
   test:
     name: Molecule
-    runs-on: ["self-hosted"]
+    runs-on: ["vm-ssd"]
     strategy:
       matrix:
         distro:
@@ -23,10 +25,10 @@ jobs:
 
     steps:
       - name: Check out the codebase.
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Python 3
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
@@ -35,42 +37,15 @@ jobs:
 
       - name: Install galaxy role
         run: |
-          ansible-galaxy role install -f -r requirements.yml
           ansible-galaxy role remove udienz.bind
+          ansible-galaxy role install -f -r requirements.yml
 
       - name: Run Molecule Primary/Secondary/Forwarder converge
         run: molecule converge
         env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
-
-      - name: Copy artifact
-        run: |
-          mkdir ${{ github.workspace }}/${{ matrix.distro }}
-          docker cp ${{ matrix.distro }}:/etc/named.conf ${{ github.workspace }}/${{ matrix.distro }}/etc/named.conf
-          docker cp ${{ matrix.distro }}:/etc/named/ ${{ github.workspace }}/${{ matrix.distro }}/etc/named/
-          docker cp ${{ matrix.distro }}:/etc/var/named/ ${{ github.workspace }}/${{ matrix.distro }}/var/named/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Artifact for ${{ matrix.distro }}
-          path: |
-           ${{ github.workspace }}/${{ matrix.distro }}/var/named/
-           ${{ github.workspace }}/${{ matrix.distro }}/etc/named/
-           ${{ github.workspace }}/${{ matrix.distro }}/etc/named.conf
 
       - name: Run Molecule Primary/Secondary/Forwarder destroy
         run: molecule destroy
         env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DISTRO: ${{ matrix.distro }}
-
-      - name: Run Molecule Shared Inventory tests
-        run: molecule test --scenario-name shared_inventory
-        env:
-          PY_COLORS: '1'
-          ANSIBLE_FORCE_COLOR: '1'
           MOLECULE_DISTRO: ${{ matrix.distro }}
